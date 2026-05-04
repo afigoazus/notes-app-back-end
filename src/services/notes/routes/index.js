@@ -9,13 +9,29 @@ import {
 import validate from '../../../middlewares/validate.js';
 import { notePayloadSchema, noteQuerySchema } from '../validator/schema.js';
 import validateQuery from '../../../middlewares/validateQuery.js';
+import authenticationToken from '../../../middlewares/auth.js';
 
 const router = express.Router();
 
-router.get('/notes', validateQuery(noteQuerySchema), getNotes);
-router.post('/notes', validate(notePayloadSchema), createNote);
-router.get('/notes/:id', getNoteById);
-router.put('/notes/:id', validate(notePayloadSchema), editNoteById);
-router.delete('/notes/:id', deleteNoteById);
+router.get(
+  '/notes',
+  authenticationToken,
+  validateQuery(noteQuerySchema),
+  getNotes,
+);
+router.post(
+  '/notes',
+  authenticationToken,
+  validate(notePayloadSchema),
+  createNote,
+);
+router.get('/notes/:id', authenticationToken, getNoteById);
+router.put(
+  '/notes/:id',
+  authenticationToken,
+  validate(notePayloadSchema),
+  editNoteById,
+);
+router.delete('/notes/:id', authenticationToken, deleteNoteById);
 
 export default router;
