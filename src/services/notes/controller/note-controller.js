@@ -1,7 +1,7 @@
 import { InvariantError, NotFoundError } from '../../../exceptions/index.js';
 import response from '../../../utils/response.js';
-import NoteRepositories from '../../../repositories/note-repositories.js';
 import AuthorizationError from '../../../exceptions/authorization-error.js';
+import NoteRepositories from '../repositories/note-repositories.js';
 
 export const createNote = async (req, res, next) => {
   const { title = 'untitled', tags, body } = req.body;
@@ -30,7 +30,7 @@ export const getNoteById = async (req, res, next) => {
   const { id } = req.params;
   const { id: owner } = req.user;
 
-  const isOwner = await NoteRepositories.verifyNoteOwner(id, owner);
+  const isOwner = await NoteRepositories.verifyNoteAccess(id, owner);
 
   if (!isOwner) {
     return next(
@@ -52,7 +52,7 @@ export const editNoteById = async (req, res, next) => {
   const { title, tags, body } = req.body;
   const { id: owner } = req.user;
 
-  const isOwner = await NoteRepositories.verifyNoteOwner(id, owner);
+  const isOwner = await NoteRepositories.verifyNoteAccess(id, owner);
 
   if (!isOwner) {
     return next(
