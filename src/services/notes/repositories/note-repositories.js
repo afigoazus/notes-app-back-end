@@ -1,11 +1,13 @@
 import { nanoid } from 'nanoid';
 import { Pool } from 'pg';
 import collaborationRepositories from '../../collaborations/repositories/collaboration-repositories.js';
+import CacheService from '../../../cache/redis-service.js';
 
 class NoteRepositories {
   constructor() {
     this.pool = new Pool();
     this.collaborationRepositories = collaborationRepositories;
+    this.cacheService = new CacheService();
   }
 
   async createNote({ title, body, tags, owner }) {
@@ -20,18 +22,29 @@ class NoteRepositories {
 
     const result = await this.pool.query(query);
 
+    await this.cacheService.delete(`notes:${owner}`);
+
     return result.rows[0];
   }
 
   async getNotes(owner) {
-    const query = {
-      text: 'SELECT notes.* FROM notes LEFT JOIN collaborations ON collaborations.note_id = notes.id WHERE notes.owner = $1 OR collaborations.user_id = $1 GROUP BY notes.id',
-      values: [owner],
-    };
+    const cacheKey = `notes:${owner}`;
 
-    const result = await this.pool.query(query);
+    try {
+      const notes = await this.cacheService.get(cacheKey);
+      return JSON.parse(notes);
+    } catch {
+      const query = {
+        text: 'SELECT notes.* FROM notes LEFT JOIN collaborations ON collaborations.note_id = notes.id WHERE notes.owner = $1 OR collaborations.user_id = $1 GROUP BY notes.id',
+        values: [owner],
+      };
 
-    return result.rows;
+      const result = await this.pool.query(query);
+
+      await this.cacheService.set(cacheKey, JSON.stringify(result.rows));
+
+      return result.rows;
+    }
   }
 
   async getNotesById(id) {
@@ -48,22 +61,32 @@ class NoteRepositories {
   async editNote({ id, title, body, tags }) {
     const updatedAt = new Date().toISOString();
     const query = {
-      text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id',
+      text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id, owner',
       values: [title, body, tags, updatedAt, id],
     };
 
     const result = await this.pool.query(query);
+
+    const owner = result.rows[0].owner;
+    if (result.rows[0]) {
+      await this.cacheService.delete(`notes:${owner}`);
+    }
 
     return result.rows[0];
   }
 
   async deleteNoteById(id) {
     const query = {
-      text: 'DELETE FROM notes WHERE id = $1 RETURNING id',
+      text: 'DELETE FROM notes WHERE id = $1 RETURNING id, owner',
       values: [id],
     };
 
     const result = await this.pool.query(query);
+
+    const owner = result.rows[0].owner;
+    if (result.rows[0]) {
+      await this.cacheService.delete(`notes:${owner}`);
+    }
 
     return result.rows[0].id;
   }
